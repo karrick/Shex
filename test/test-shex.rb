@@ -1,11 +1,11 @@
 #!/usr/bin/env ruby
 
-require 'fileutils'
-require 'test/unit'
+require "fileutils"
+require "test/unit"
 
-$:.unshift File.join(File.dirname(__FILE__), '..', 'lib')
-$:.unshift File.join(File.dirname(__FILE__), '..', 'lib', 'version')
-require 'Shex'
+$:.unshift File.join(File.dirname(__FILE__), "..", "lib")
+$:.unshift File.join(File.dirname(__FILE__), "..", "lib", "version")
+require "Shex"
 
 class TestShexHelpers < Test::Unit::TestCase
 
@@ -21,11 +21,11 @@ class TestShexHelpers < Test::Unit::TestCase
   end
 
   def test_change_host_localhost
-    assert_equal("hostname", Shex.change_host("hostname", 'localhost'))
+    assert_equal("hostname", Shex.change_host("hostname", "localhost"))
   end
 
   def test_change_host_this_host
-    assert_equal("hostname", Shex.change_host("hostname", `hostname -s`.strip))
+    assert_equal("hostname", Shex.change_host("hostname", %x(hostname -s).strip))
   end
 
   def test_change_host_other
@@ -45,7 +45,7 @@ class TestShexHelpers < Test::Unit::TestCase
   end
 
   def test_change_user_logname
-    assert_equal("id", Shex.change_user("id", ENV['LOGNAME']))
+    assert_equal("id", Shex.change_user("id", ENV["LOGNAME"]))
   end
 
   def test_change_user_root

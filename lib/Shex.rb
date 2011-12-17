@@ -1,4 +1,4 @@
-require 'fileutils'
+require "fileutils"
 require "Shex/version"
 
 module Shex
@@ -130,7 +130,7 @@ module Shex
 
   def self.change_host(command, hostname=nil)
     case hostname
-    when nil, 'localhost', HOSTNAME
+    when nil, "localhost", HOSTNAME
       command
     else
       a = %w[-Tq -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o ConnectTimeout=3]
@@ -141,7 +141,7 @@ module Shex
 
   def self.change_user(command, user=nil)
     case user
-    when nil, "", ENV['LOGNAME']
+    when nil, "", ENV["LOGNAME"]
       command
     when "root"
       "sudo -n #{command}"
