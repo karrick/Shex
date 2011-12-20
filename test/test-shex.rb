@@ -127,10 +127,7 @@ class TestShexHelpers < Test::Unit::TestCase
 
 end
 
-class TestShex < Test::Unit::TestCase
-
-  ################
-  # return status
+class TestShexStatusAndOkay < Test::Unit::TestCase
 
   def test_true
     assert_equal({:status=>0, :stdout=>"", :stderr=>"", :okay=>true},
@@ -148,8 +145,54 @@ class TestShex < Test::Unit::TestCase
     end
   end
 
-  ################
-  # standard streams
+end
+
+class TestShexWithStandardRedirection < Test::Unit::TestCase
+
+  def test_reraises_exceptions
+    assert_raises RuntimeError do
+      Shex.with_standard_redirection do
+        raise "unforgettable exception"
+      end
+    end
+  end
+
+  def test_returns_value
+    assert_equal({:stdout=>"", :stderr=>"", :value=>42},
+                 Shex.with_standard_redirection { 42 })
+  end
+
+  def test_redirect_stdout
+    assert_equal({:stdout=>"one\ntwo\nthree\n", :stderr=>"", :value=>42},
+                 Shex.with_standard_redirection do
+                   %w(one two three).each do |line|
+                     system("printf '%s\n' '#{line}'")
+                   end
+                   42
+                 end)
+  end
+
+  def test_redirect_stderr
+    assert_equal({:stderr=>"one\ntwo\nthree\n", :stdout=>"", :value=>42},
+                 Shex.with_standard_redirection do
+                   %w(one two three).each do |line|
+                     system("printf '%s\n' '#{line}' >&2")
+                   end
+                   42
+                 end)
+  end
+
+  def test_redirect_stdin
+    assert_equal({:stdout=>"one\ntwo\nthree\n", :stderr=>"", :value=>nil},
+                 Shex.with_standard_redirection(:stdin=>"one\ntwo\nthree\n") do
+                   system("cat")
+                   nil
+                 end)
+  end
+
+end
+
+class TestShexShexWrapping < Test::Unit::TestCase
 
   def test_redirect_stdin
     assert_equal({:status=>0, :stdout=>"one\ntwo\nthree\n", :stderr=>"", :okay=>true},
@@ -165,6 +208,10 @@ class TestShex < Test::Unit::TestCase
     assert_equal({:status=>0, :stdout=>"", :stderr=>"hello world\n", :okay=>true},
                  Shex.shex("echo hello world >&2"))
   end
+
+end
+
+class TestShexFileSystem < Test::Unit::TestCase
 
   ################
 

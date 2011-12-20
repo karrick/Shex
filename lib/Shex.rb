@@ -23,7 +23,64 @@ module Shex
     shex("test -e #{pathname}", options)[:okay]
   end
 
+  def self.with_standard_redirection(options={}, &block)
+    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
+    raise(ArgumentError,"method requires block") unless block_given?
+    
+    result = {}
+    begin
+      stdin_saved  = $stdin.dup
+      stdout_saved = $stdout.dup
+      stderr_saved = $stderr.dup
+
+      with_temp do |temp_stdin|
+        if options[:stdin]
+          File.open(temp_stdin,"w") {|io| io.write options[:stdin]}
+          $stdin.reopen(temp_stdin,"r")
+        end
+
+        with_temp do |temp_stdout|
+          $stdout.reopen(temp_stdout,"w")
+
+          with_temp do |temp_stderr|
+            $stderr.reopen(temp_stderr,"w")
+
+            begin
+              result.merge!(:value => yield)
+            ensure
+              result.update(:stdout => File.read(temp_stdout))
+              result.update(:stderr => File.read(temp_stderr))
+            end
+
+          end
+        end 
+     end
+    rescue
+      stderr_saved.puts $!
+      raise $!
+    ensure
+      $stdin.reopen(stdin_saved)
+      $stdout.reopen(stdout_saved)
+      $stderr.reopen(stderr_saved)
+    end
+    result
+  end
+
   def self.shex(command, options={})
+    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
+
+    result = with_standard_redirection(options) do
+      okay = system(noop(command,options))
+      {:okay => okay, :status => $?.exitstatus}
+    end
+    { :okay => result[:value][:okay],
+      :status => result[:value][:status],
+      :stdout => result[:stdout],
+      :stderr => result[:stderr],
+    }
+  end
+
+  def self.shex_(command, options={})
     raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
     result = nil
     begin
@@ -115,7 +172,7 @@ module Shex
 
   def self.with_temp(options={}, &block)
     raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
-    raise(ArgumentError,"method requires block") if not block_given?
+    raise(ArgumentError,"method requires block") unless block_given?
 
     begin
       create = (options[:dir] ? "mktemp -d" : "mktemp")
