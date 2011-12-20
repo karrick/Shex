@@ -209,20 +209,20 @@ class TestShex < Test::Unit::TestCase
   def test_with_temp_remote
     entity = nil
     Shex.with_temp(:host => "localhost") do |temp|
-      assert(Shex.file?(temp, "localhost"))
+      assert(Shex.file?(temp, :host => "localhost"))
       entity = temp
     end
-    assert(!Shex.file?(entity, "localhost"),
+    assert(!Shex.file?(entity, :host => "localhost"),
            "should remove temp after block")
   end
 
   def test_with_temp_remote_directory
     entity = nil
     Shex.with_temp(:dir => true, :host => "localhost") do |temp|
-      assert(Shex.directory?(temp, "localhost"))
+      assert(Shex.directory?(temp, :host => "localhost"))
       entity = temp
     end
-    assert(!Shex.directory?(entity, "localhost"),
+    assert(!Shex.directory?(entity, :host => "localhost"),
            "should remove temp after block")
   end
 
@@ -239,8 +239,7 @@ class TestShex < Test::Unit::TestCase
 
   def test_move_directory_clobber_raises_when_missing_src
     assert_raises RuntimeError do
-      Shex.move_directory_clobber("localhost", File.join(File.dirname(__FILE__), "non-existant"),
-                                  "does-not-matter")
+      Shex.move_directory_clobber("non-existant", File.join(File.dirname(__FILE__), "non-existant"))
     end
   end
 

@@ -14,14 +14,17 @@ module Shex
   ########################################
 
   def self.directory?(pathname, options={})
+    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
     shex("test -d #{pathname}", options)[:okay]
   end
 
   def self.file?(pathname, options={})
+    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
     shex("test -e #{pathname}", options)[:okay]
   end
 
   def self.shex(command, options={})
+    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
     result = nil
     begin
       stdin_saved  = $stdin.dup
@@ -59,6 +62,7 @@ module Shex
   end
 
   def self.shex!(command, options={})
+    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
     result = shex(command, options)
     if not result[:okay]
       error_message = options[:emsg] || "error #{result[:status]}: #{command}"
@@ -68,63 +72,67 @@ module Shex
     result
   end
 
-  def self.scp(src, dest)
-    shex!("scp -qB -o StrictHostKeyChecking=no -o ConnectTimeout=3 #{src} #{dest}")
-  end
+  ################
 
-  def self.with_temp(options={}, &block)
-    if not block_given?
-      raise(ArgumentError, "method requires block")
-    end
+  def self.install(source, dest, options={})
+    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
+    raise sprintf("missing source file: %s", source) unless File.exists?(source)
 
-    begin
-      create = (options[:dir] ? "mktemp -d" : "mktemp")
-      case options[:host]
-      when nil
-        temp = %x(#{create}).strip
-      else
-        temp = shex!(create, options)[:stdout].strip
-      end
-      yield(temp)
-    ensure
-      if temp
-        case options[:host]
-        when nil
-          FileUtils.remove_entry(temp) if File.exists?(temp)
-        else
-          if file?(temp, options[:host])
-            shex!("rm -rf #{temp}", options) 
-          end
-        end
-      end
-    end
-  end
-
-  def self.move_directory_clobber(src, dest, options)
-    # TODO: backup and restore if exception raised
-    if directory?(src, options)
-      if directory?(dest, options)
-        shex!("rm -rf #{dest}", options)
-      end
-      shex!("mv #{src} #{dest}", options)
-    else
-      raise "error: missing #{options[:host]}:#{src}"
-    end
-  end
-
-  def self.install(src, dest, options)
+    permissions = "-m #{options[:permissions]}" if options[:permissions]
     owner = "-o #{options[:owner]}" if options[:owner]
     group = "-g #{options[:group]}" if options[:group]
-    permissions = "-m #{options[:permissions]}" if options[:permissions]
     suffix = "-S .#{options[:suffix]}" if options[:suffix]
 
     hostname = options[:host]
     with_temp(options.merge(:user => nil)) do |temp|
       if ! is_localhost?(hostname)
-        scp(src, sprintf("%s:%s", hostname, temp))
-        src = temp
+        scp(source, sprintf("%s:%s", hostname, temp))
+        source = temp
       end
-      shex!("install #{suffix} #{permissions} #{owner} #{group} #{src} #{dest}", options)
+      shex!("install #{suffix} #{permissions} #{owner} #{group} #{source} #{dest}", options)
+    end
+  end
+
+  def self.move_directory_clobber(source, dest, options={})
+    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
+
+    # TODO: backup and restore if exception raised
+
+    if directory?(source, options)
+      if directory?(dest, options)
+        shex!("rm -rf #{dest}", options)
+      end
+      suffix = "-S .#{options[:suffix]}" if options[:suffix]
+      shex!("mv #{suffix} #{source} #{dest}", options)
+    else
+      raise "error: missing #{options[:host]}:#{source}"
+    end
+  end
+
+  def self.scp(source, dest)
+    shex!("scp -qB -o StrictHostKeyChecking=no -o ConnectTimeout=3 #{source} #{dest}")
+  end
+
+  def self.with_temp(options={}, &block)
+    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
+    raise(ArgumentError,"method requires block") if not block_given?
+
+    begin
+      create = (options[:dir] ? "mktemp -d" : "mktemp")
+      if is_localhost?(options[:host])
+        temp = %x(#{create}).strip
+      else
+        temp = shex!(create, options)[:stdout].strip
+      end
+      yield temp
+    ensure
+      if temp
+        if is_localhost?(options[:host])
+          FileUtils.remove_entry(temp) if File.exists?(temp)
+        else
+          shex!("rm -rf #{temp}", options) 
+        end
+      end
     end
   end
 
