@@ -14,6 +14,26 @@ class TestShexHelpers < Test::Unit::TestCase
   end
 
   ################
+  # is_localhost?
+
+  def test_is_localhost?_no_host
+    assert_equal("hostname", Shex.is_localhost?("hostname"))
+  end
+
+  def test_is_localhost?_localhost
+    assert_equal("hostname", Shex.is_localhost?("hostname", "localhost"))
+  end
+
+  def test_is_localhost?_this_host
+    assert_equal("hostname", Shex.is_localhost?("hostname", %x(hostname -s).strip))
+  end
+
+  def test_is_localhost?_other
+    assert_equal("ssh -Tq -o PasswordAuthentication\\=no -o StrictHostKeyChecking\\=no -o ConnectTimeout\\=3 other hostname", 
+                 Shex.is_localhost?("hostname", "other"))
+  end
+
+  ################
   # change_host
 
   def test_change_host_no_host

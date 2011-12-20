@@ -113,13 +113,17 @@ module Shex
   end
 
   def self.install(src, dest, options)
-    suffix = "-S .#{options[:suffix]}" if options[:suffix]
-    permissions = "-m #{options[:permissions]}" if options[:permissions]
     owner = "-o #{options[:owner]}" if options[:owner]
-    group = "-o #{options[:group]}" if options[:group]
+    group = "-g #{options[:group]}" if options[:group]
+    permissions = "-m #{options[:permissions]}" if options[:permissions]
+    suffix = "-S .#{options[:suffix]}" if options[:suffix]
 
-    with_temp(options) do |temp|
-      scp(src,"#{options[:host]}:#{temp}")
+    hostname = options[:host]
+    with_temp(options.merge(:user => nil)) do |temp|
+      if ! is_localhost?(hostname)
+        scp(src, sprintf("%s:%s", hostname, temp))
+        src = temp
+      end
       shex!("install #{suffix} #{permissions} #{owner} #{group} #{src} #{dest}", options)
     end
   end
@@ -128,9 +132,17 @@ module Shex
   # helper methods
   ########################################
 
-  def self.change_host(command, hostname=nil)
+  def self.is_localhost?(hostname=nil)
     case hostname
     when nil, "localhost", HOSTNAME
+      true
+    else
+      false
+    end
+  end
+
+  def self.change_host(command, hostname=nil)
+    if is_localhost?(hostname)
       command
     else
       a = %w[-Tq -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o ConnectTimeout=3]
