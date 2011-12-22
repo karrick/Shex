@@ -30,6 +30,7 @@ module Shex
     file_system_test(pathname, options.merge(:test => 'f'))
   end
 
+  # TODO: not sure how I'm going to solidify using can_connect? as a wrapper around shex
   def self.maybe_shex(command, options={})
     raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
 
