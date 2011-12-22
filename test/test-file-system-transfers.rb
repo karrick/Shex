@@ -9,12 +9,44 @@ require "Shex"
 
 class TestShexFileSystemTransfers < Test::Unit::TestCase
 
-  def test_scp
-    Shex.with_temp do |local_temp|
-      File.open(local_temp,"w") {|io| io.write "foo bar baz" }
-      Shex.with_temp(:host => "localhost") do |remote_temp|
-        Shex.scp(local_temp, "localhost:#{remote_temp}")
-        assert_equal("foo bar baz", File.read(remote_temp),
+  def test_scp_both_remote_raises
+    assert_raises RuntimeError do
+      Shex.scp("limbo@example.org:foo", "limbo@example.org:bar")
+    end
+  end
+
+  def test_scp_neither_remote_works
+    Shex.with_temp do |source|
+      File.open(source,"w") { |io| io.write "foo bar baz" }
+      Shex.with_temp do |dest|
+        Shex.scp(source, dest)
+        assert_equal("foo bar baz", File.read(dest))
+      end
+    end
+  end
+
+  def test_scp_local_to_remote
+    Shex.with_temp do |source|
+      File.open(source,"w") { |io| io.write "foo bar baz" }
+
+      Shex.with_temp(:host => "localhost") do |dest|
+        Shex.scp(source, "localhost:#{dest}")
+
+        assert_equal("foo bar baz", File.read(dest),
+                     "NOTE: test_scp only works if can ssh into localhost")
+      end
+    end
+  end
+
+  def test_scp_remote_to_local
+    Shex.with_temp do |source|
+      File.open(source,"w") { |io| io.write "foo bar baz" }
+
+      Shex.with_temp(:host => "localhost") do |dest|
+
+        Shex.scp(sprintf("localhost:%s", source), dest)
+
+        assert_equal("foo bar baz", File.read(dest),
                      "NOTE: test_scp only works if can ssh into localhost")
       end
     end

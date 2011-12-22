@@ -30,6 +30,16 @@ module Shex
     file_system_test(pathname, options.merge(:test => 'f'))
   end
 
+  def self.maybe_shex(command, options={})
+    raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
+
+    if not can_connect?(options[:host])
+      raise(ConnectionError, sprintf('connection error: %s', options[:host]))
+    else
+      shex(command, options)
+    end
+  end
+
   def self.shex(command, options={})
     raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
 
@@ -148,7 +158,22 @@ module Shex
   end
 
   def self.scp(source, dest)
-    shex!(sprintf('scp -Bpq -o StrictHostKeyChecking=no -o ConnectTimeout=2 %s %s', source, dest))
+    if source =~ /^(.+):.+/
+      source_host = $1
+    end
+    if dest =~ /^(.+):.+/
+      dest_host = $1
+    end
+
+    if ! source_host.nil? && ! dest_host.nil?
+      raise sprintf('source host and dest host cannot both be remote hosts: %s, %s', source_host, dest_host)
+    else
+      hostname = (source_host || dest_host)
+    end
+
+    if hostname.nil? || can_connect?(hostname)
+      shex!(sprintf('scp -Bpq -o StrictHostKeyChecking=no -o ConnectTimeout=2 %s %s', source, dest))
+    end
   end
 
   def self.with_temp(options={}, &block)
@@ -182,9 +207,11 @@ module Shex
     REMOTE_USERS.delete(hostname) if retest
 
     if not REMOTE_USERS.has_key?(hostname)
-      result = Shex.shex('whoami', :host => hostname)
-      if result[:status].zero?
-        REMOTE_USERS[hostname] = result[:stdout].strip
+      STDERR.print sprintf("* Checking connection to %s\n", hostname) if $DEBUG
+      command = noop('whoami', :host => hostname)
+      result = %x(#{command})
+      if result != ''
+        REMOTE_USERS[hostname] = result.strip
       end
     end
 
