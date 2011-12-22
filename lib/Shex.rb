@@ -178,6 +178,40 @@ module Shex
   # helper methods
   ########################################
 
+  def self.can_connect?(hostname, retest=false)
+    REMOTE_USERS.delete(hostname) if retest
+
+    if not REMOTE_USERS.has_key?(hostname)
+      result = Shex.shex('whoami', :host => hostname)
+      if result[:status].zero?
+        REMOTE_USERS[hostname] = result[:stdout].strip
+      end
+    end
+
+    (REMOTE_USERS.has_key?(hostname) ? true : false)
+  end
+
+  def self.change_host(command, hostname=nil)
+    if is_localhost?(hostname)
+      command
+    else
+      a = %w[-qTx -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o ConnectTimeout=2]
+      a << [hostname, command]
+      a.flatten.map { |x| shell_quote(x) }.unshift('ssh').join(' ')
+    end
+  end
+
+  def self.change_user(command, user=nil)
+    case user
+    when nil, '', ENV['LOGNAME']
+      command
+    when 'root'
+      sprintf('sudo -n %s', command)
+    else
+      sprintf('sudo -inu %s %s', user, command)
+    end
+  end
+
   def self.file_system_test(pathname, options={})
     raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
 
@@ -203,27 +237,6 @@ module Shex
     end
   end
 
-  def self.change_host(command, hostname=nil)
-    if is_localhost?(hostname)
-      command
-    else
-      a = %w[-qTx -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o ConnectTimeout=2]
-      a << [hostname, command]
-      a.flatten.map { |x| shell_quote(x) }.unshift('ssh').join(' ')
-    end
-  end
-
-  def self.change_user(command, user=nil)
-    case user
-    when nil, '', ENV['LOGNAME']
-      command
-    when 'root'
-      sprintf('sudo -n %s', command)
-    else
-      sprintf('sudo -inu %s %s', user, command)
-    end
-  end
-
   def self.noop(command, options={})
     change_host(change_user(command, options[:user]), options[:host])
   end
@@ -239,19 +252,6 @@ module Shex
       # This should be safe enough even for really weird shells.
       arg.gsub(/([^-0-9a-zA-Z_.\/])/) { |m| "\\#{m}" }
     end
-  end
-
-  def self.can_connect?(hostname, retest=false)
-    REMOTE_USERS.delete(hostname) if retest
-
-    if not REMOTE_USERS.has_key?(hostname)
-      result = Shex.shex('whoami', :host => hostname)
-      if result[:status].zero?
-        REMOTE_USERS[hostname] = result[:stdout].strip
-      end
-    end
-
-    (REMOTE_USERS.has_key?(hostname) ? true : false)
   end
 
 end
