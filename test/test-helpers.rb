@@ -10,26 +10,44 @@ require "Shex"
 class TestShexHelpers < Test::Unit::TestCase
 
   def test_hostname
-    assert_equal %x(hostname -s).strip, Shex::HOSTNAME
+    assert_equal(%x(hostname -s).strip, Shex::HOSTNAME)
+  end
+
+  ################
+  # test connection
+
+  def test_can_connect
+    assert_equal({}, Shex::REMOTE_USERS)
+
+    assert_equal(false, Shex.can_connect?('limbo@example.com'))
+    assert_equal({}, Shex::REMOTE_USERS)
+
+    assert_equal(true, Shex.can_connect?('localhost'))
+    assert_equal({'localhost' => ENV['LOGNAME']}, Shex::REMOTE_USERS)
+
+    assert_equal(true, Shex.can_connect?('karrick.org'))
+    assert_equal({'localhost' => ENV['LOGNAME'],
+                   'karrick.org' => 'karrick'},
+                 Shex::REMOTE_USERS)
   end
 
   ################
   # is_localhost?
 
-  def test_is_localhost?_no_parameter
-    assert(Shex.is_localhost?)
+  def test_is_localhost_empty_string
+    assert_equal(true, Shex.is_localhost?(""))
   end
 
-  def test_is_localhost?_localhost
-    assert(Shex.is_localhost?("localhost"))
+  def test_is_localhost_localhost
+    assert_equal(true, Shex.is_localhost?("localhost"))
   end
 
-  def test_is_localhost?_this_host
-    assert(Shex.is_localhost?(%x(hostname -s).strip))
+  def test_is_localhost_this_host
+    assert_equal(true, Shex.is_localhost?(%x(hostname -s).strip))
   end
 
-  def test_is_localhost?_other
-    assert(!Shex.is_localhost?("other"))
+  def test_is_localhost_other
+    assert_equal(false, Shex.is_localhost?("other"))
   end
 
   ################
@@ -48,7 +66,7 @@ class TestShexHelpers < Test::Unit::TestCase
   end
 
   def test_change_host_other
-    assert_equal("ssh -Tq -o PasswordAuthentication\\=no -o StrictHostKeyChecking\\=no -o ConnectTimeout\\=3 other hostname", 
+    assert_equal("ssh -qTx -o PasswordAuthentication\\=no -o StrictHostKeyChecking\\=no -o ConnectTimeout\\=2 other hostname",
                  Shex.change_host("hostname", "other"))
   end
 
@@ -88,12 +106,12 @@ class TestShexHelpers < Test::Unit::TestCase
   end
 
   def test_change_no_user_other_host
-    assert_equal("ssh -Tq -o PasswordAuthentication\\=no -o StrictHostKeyChecking\\=no -o ConnectTimeout\\=3 other hostname",
+    assert_equal("ssh -qTx -o PasswordAuthentication\\=no -o StrictHostKeyChecking\\=no -o ConnectTimeout\\=2 other hostname",
                  Shex.noop("hostname", :host => "other"))
   end
 
   def test_change_other_user_other_host
-    assert_equal("ssh -Tq -o PasswordAuthentication\\=no -o StrictHostKeyChecking\\=no -o ConnectTimeout\\=3 other sudo\\ -inu\\ bozo\\ hostname",
+    assert_equal("ssh -qTx -o PasswordAuthentication\\=no -o StrictHostKeyChecking\\=no -o ConnectTimeout\\=2 other sudo\\ -inu\\ bozo\\ hostname",
                  Shex.noop("hostname", :user => "bozo", :host => "other"))
   end
 
@@ -125,4 +143,3 @@ class TestShexHelpers < Test::Unit::TestCase
   end
 
 end
-

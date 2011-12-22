@@ -1,5 +1,5 @@
-require "fileutils"
-require "Shex/version"
+require 'fileutils'
+require 'Shex/version'
 
 module Shex
 
@@ -7,28 +7,65 @@ module Shex
   # module constant below is set at load time
   ########################################
 
+  class ConnectionError < RuntimeError ; end
+
   HOSTNAME = %x(hostname -s).strip
+
+  # remembers the observed username when logging into remote host
+  REMOTE_USERS = {}
 
   ########################################
   # api
   ########################################
 
   def self.directory?(pathname, options={})
-    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
+    raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
 
-    shex("test -d #{pathname}", options)[:okay]
+    file_system_test(pathname, options.merge(:test => 'd'))
   end
 
   def self.file?(pathname, options={})
-    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
+    raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
 
-    shex("test -e #{pathname}", options)[:okay]
+    file_system_test(pathname, options.merge(:test => 'f'))
+  end
+
+  def self.shex(command, options={})
+    raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
+
+    result = with_standard_redirection(options) do
+      okay = system(noop(command, options))
+      {:okay => okay, :status => $?.exitstatus}
+    end
+
+    { :okay   => result[:value][:okay],
+      :status => result[:value][:status],
+      :stdout => result[:stdout],
+      :stderr => result[:stderr],
+    }
+  end
+
+  def self.shex!(command, options={})
+    raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
+
+    result = shex(command, options)
+
+    if ((result[:status] == 255) && (not is_localhost?(options[:host])))
+      raise(ConnectionError, sprintf('connection error: %s', options[:host]))
+    end
+
+    if not result[:okay]
+      error_message = (options[:emsg] || sprintf('status %s: %s', result[:status], command))
+      error_class = (options[:eclass] || RuntimeError)
+      raise(error_class, sprintf("%s\n%s\n", error_message, result[:stderr]))
+    end
+    result
   end
 
   def self.with_standard_redirection(options={}, &block)
-    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
-    raise(ArgumentError,"method requires block") unless block_given?
-    
+    raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
+    raise(ArgumentError, 'method requires block') unless block_given?
+
     result = {}
     stdin_saved  = $stdin.dup
     stdout_saved = $stdout.dup
@@ -36,15 +73,15 @@ module Shex
 
     with_temp do |temp_stdin|
       if options[:stdin]
-        File.open(temp_stdin,"w") {|io| io.write options[:stdin]}
-        $stdin.reopen(temp_stdin,"r")
+        File.open(temp_stdin, 'w') { |io| io.write options[:stdin] }
+        $stdin.reopen(temp_stdin, 'r')
       end
 
       with_temp do |temp_stdout|
-        $stdout.reopen(temp_stdout,"w")
+        $stdout.reopen(temp_stdout, 'w')
 
         with_temp do |temp_stderr|
-          $stderr.reopen(temp_stderr,"w")
+          $stderr.reopen(temp_stderr, 'w')
 
           begin
             result.update(:value => yield)
@@ -66,34 +103,7 @@ module Shex
           end
 
         end
-      end 
-    end
-    result
-  end
-
-  def self.shex(command, options={})
-    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
-
-    result = with_standard_redirection(options) do
-      okay = system(noop(command,options))
-      {:okay => okay, :status => $?.exitstatus}
-    end
-
-    { :okay   => result[:value][:okay],
-      :status => result[:value][:status],
-      :stdout => result[:stdout],
-      :stderr => result[:stderr],
-    }
-  end
-
-  def self.shex!(command, options={})
-    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
-
-    result = shex(command, options)
-    if not result[:okay]
-      error_message = options[:emsg] || "error #{result[:status]}: #{command}"
-      error_class = options[:eclass] || RuntimeError
-      raise(error_class, "#{error_message}#{$/}#{result[:stderr]}#{$/}")
+      end
     end
     result
   end
@@ -101,50 +111,52 @@ module Shex
   ################
 
   def self.install(source, dest, options={})
-    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
-    raise sprintf("missing source file: %s", source) unless File.exists?(source)
+    raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
+    raise sprintf('missing source file: %s', source) unless File.exists?(source)
 
-    permissions = "-m #{options[:permissions]}" if options[:permissions]
-    owner = "-o #{options[:owner]}" if options[:owner]
-    group = "-g #{options[:group]}" if options[:group]
-    suffix = "-S .#{options[:suffix]}" if options[:suffix]
+    permissions = sprintf('-m %s', options[:permissions]) if options[:permissions]
+    owner = sprintf('-o %s', options[:owner]) if options[:owner]
+    group = sprintf('-g %s', options[:group]) if options[:group]
+    suffix = sprintf('-S .%s', options[:suffix]) if options[:suffix]
 
     hostname = options[:host]
     with_temp(options.merge(:user => nil)) do |temp|
-      if ! is_localhost?(hostname)
-        scp(source, sprintf("%s:%s", hostname, temp))
+      if not is_localhost?(hostname)
+        scp(source, sprintf('%s:%s', hostname, temp))
         source = temp
       end
-      shex!("install #{suffix} #{permissions} #{owner} #{group} #{source} #{dest}", options)
+      shex!(sprintf('install %s %s %s %s %s %s',
+                    suffix, permissions, owner, group, source, dest),
+            options)
     end
   end
 
   def self.move_directory_clobber(source, dest, options={})
-    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
+    raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
 
     # TODO: backup and restore if exception raised
 
-    if directory?(source, options)
-      if directory?(dest, options)
-        shex!("rm -rf #{dest}", options)
-      end
-      suffix = "-S .#{options[:suffix]}" if options[:suffix]
-      shex!("mv #{suffix} #{source} #{dest}", options)
+    if not directory?(source, options)
+      raise sprintf('missing %s:%s', options[:host], source)
     else
-      raise "error: missing #{options[:host]}:#{source}"
+      if directory?(dest, options)
+        shex!(sprintf('rm -rf %s', dest), options)
+      end
+      suffix = sprintf('-S .%s', options[:suffix]) if options[:suffix]
+      shex!(sprintf('mv %s %s %s', suffix, source, dest), options)
     end
   end
 
   def self.scp(source, dest)
-    shex!("scp -qB -o StrictHostKeyChecking=no -o ConnectTimeout=3 #{source} #{dest}")
+    shex!(sprintf('scp -Bpq -o StrictHostKeyChecking=no -o ConnectTimeout=2 %s %s', source, dest))
   end
 
   def self.with_temp(options={}, &block)
-    raise(ArgumentError,"options should be a Hash") unless options.kind_of?(Hash)
-    raise(ArgumentError,"method requires block") unless block_given?
+    raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
+    raise(ArgumentError, 'method requires block') unless block_given?
 
     begin
-      create = (options[:dir] ? "mktemp -d" : "mktemp")
+      create = (options[:dir] ? 'mktemp -d' : 'mktemp')
       if is_localhost?(options[:host])
         temp = %x(#{create}).strip
       else
@@ -156,7 +168,7 @@ module Shex
         if is_localhost?(options[:host])
           FileUtils.remove_entry(temp) if File.exists?(temp)
         else
-          shex!("rm -rf #{temp}", options) 
+          shex!(sprintf('rm -rf %s', temp), options)
         end
       end
     end
@@ -166,9 +178,25 @@ module Shex
   # helper methods
   ########################################
 
-  def self.is_localhost?(hostname=nil)
+  def self.file_system_test(pathname, options={})
+    raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
+
+    result = shex(sprintf('test -%s %s', options[:test], pathname), options)
+    case result[:status]
+    when 0
+      true
+    when 1
+      false
+    when 255
+      raise(ConnectionError, sprintf('connection error: %s', options[:host]))
+    else
+      raise sprintf('unexpected status: %d', result[:status])
+    end
+  end
+
+  def self.is_localhost?(hostname)
     case hostname
-    when nil, "localhost", HOSTNAME
+    when nil, '', 'localhost', HOSTNAME
       true
     else
       false
@@ -179,22 +207,22 @@ module Shex
     if is_localhost?(hostname)
       command
     else
-      a = %w[-Tq -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o ConnectTimeout=3]
+      a = %w[-qTx -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o ConnectTimeout=2]
       a << [hostname, command]
-      a.flatten.map { |x| shell_quote(x) }.unshift("ssh").join(" ")
+      a.flatten.map { |x| shell_quote(x) }.unshift('ssh').join(' ')
     end
   end
 
   def self.change_user(command, user=nil)
     case user
-    when nil, "", ENV["LOGNAME"]
+    when nil, '', ENV['LOGNAME']
       command
-    when "root"
-      "sudo -n #{command}"
+    when 'root'
+      sprintf('sudo -n %s', command)
     else
-      "sudo -inu #{user} #{command}"
+      sprintf('sudo -inu %s %s', user, command)
     end
-  end    
+  end
 
   def self.noop(command, options={})
     change_host(change_user(command, options[:user]), options[:host])
@@ -203,14 +231,27 @@ module Shex
   def self.shell_quote(arg)
     case arg
     when nil
-      ""
-    when ""
+      ''
+    when ''
       %q[""]
     else
       # Quote everything except POSIX filename characters.
       # This should be safe enough even for really weird shells.
-      arg.gsub(/([^-0-9a-zA-Z_.\/])/) {|m| "\\#{m}"}
+      arg.gsub(/([^-0-9a-zA-Z_.\/])/) { |m| "\\#{m}" }
     end
+  end
+
+  def self.can_connect?(hostname, retest=false)
+    REMOTE_USERS.delete(hostname) if retest
+
+    if not REMOTE_USERS.has_key?(hostname)
+      result = Shex.shex('whoami', :host => hostname)
+      if result[:status].zero?
+        REMOTE_USERS[hostname] = result[:stdout].strip
+      end
+    end
+
+    (REMOTE_USERS.has_key?(hostname) ? true : false)
   end
 
 end
