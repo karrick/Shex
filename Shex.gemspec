@@ -1,4 +1,4 @@
-# -*- mode: ruby; encoding: utf-8 -*-
+# -*- mode: ruby -*-
 
 $:.push File.expand_path("../lib", __FILE__)
 require "Shex/version"
@@ -14,9 +14,9 @@ Gem::Specification.new do |s|
 
   s.rubyforge_project = "Shex"
 
-  s.files         = `git ls-files`.split("\n")
-  s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
-  s.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
+  s.files         = Dir.glob("{bin,lib}/**/*") + %w(README)
+  s.executables   = s.files.grep(%r{^bin/}).map{ |f| File.basename(f) }
+  s.test_files    = s.files.grep(%r{^(test|spec|features)/})
   s.require_paths = ["lib"]
 
   # specify any dependencies here; for example:

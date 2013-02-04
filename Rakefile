@@ -1,5 +1,8 @@
 require "rubygems"
 require "bundler/gem_tasks"
+require 'rake/clean'
+
+CLEAN.include('pkg')
 
 desc "Test module"
 task :test do
