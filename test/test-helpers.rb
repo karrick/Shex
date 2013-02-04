@@ -24,11 +24,6 @@ class TestShexHelpers < Test::Unit::TestCase
 
     assert_equal(true, Shex.can_connect?('localhost'))
     assert_equal({'localhost' => ENV['LOGNAME']}, Shex::REMOTE_USERS)
-
-    assert_equal(true, Shex.can_connect?('karrick.org'))
-    assert_equal({'localhost' => ENV['LOGNAME'],
-                   'karrick.org' => 'karrick'},
-                 Shex::REMOTE_USERS)
   end
 
   ################

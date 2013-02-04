@@ -1,4 +1,5 @@
-# -*- encoding: utf-8 -*-
+# -*- mode: ruby; encoding: utf-8 -*-
+
 $:.push File.expand_path("../lib", __FILE__)
 require "Shex/version"
 

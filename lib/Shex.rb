@@ -7,8 +7,6 @@ module Shex
   # module constant below is set at load time
   ########################################
 
-  class ConnectionError < RuntimeError ; end
-
   HOSTNAME = %x(hostname -s).strip
 
   # remembers the observed username when logging into remote host
@@ -35,7 +33,7 @@ module Shex
     raise(ArgumentError, 'options should be a Hash') unless options.kind_of?(Hash)
 
     if not can_connect?(options[:host])
-      raise(ConnectionError, sprintf('connection error: %s', options[:host]))
+      raise sprintf('connection error: %s', options[:host])
     else
       shex(command, options)
     end
@@ -62,7 +60,7 @@ module Shex
     result = shex(command, options)
 
     if ((result[:status] == 255) && (not is_localhost?(options[:host])))
-      raise(ConnectionError, sprintf('connection error: %s', options[:host]))
+      raise sprintf('connection error: %s', options[:host])
     end
 
     if not result[:okay]
@@ -250,7 +248,7 @@ module Shex
     when 1
       false
     when 255
-      raise(ConnectionError, sprintf('connection error: %s', options[:host]))
+      raise sprintf('connection error: %s', options[:host])
     else
       raise sprintf('unexpected status: %d', result[:status])
     end

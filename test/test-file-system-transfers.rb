@@ -25,7 +25,7 @@ class TestShexFileSystemTransfers < Test::Unit::TestCase
     end
   end
 
-  def test_scp_local_to_remote
+  def _test_scp_local_to_remote
     Shex.with_temp do |source|
       File.open(source,"w") { |io| io.write "foo bar baz" }
 
@@ -38,7 +38,7 @@ class TestShexFileSystemTransfers < Test::Unit::TestCase
     end
   end
 
-  def test_scp_remote_to_local
+  def _test_scp_remote_to_local
     Shex.with_temp do |source|
       File.open(source,"w") { |io| io.write "foo bar baz" }
 

@@ -45,7 +45,7 @@ class TestShexStatusAndOkay < Test::Unit::TestCase
   end
 
   def test_connection_error_raises
-    assert_raises Shex::ConnectionError do
+    assert_raises RuntimeError do
       Shex.shex!('true', :host => 'example.com')
     end
   end
