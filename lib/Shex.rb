@@ -1,3 +1,5 @@
+# -*- mode: ruby -*-
+
 require 'fileutils'
 require 'Shex/version'
 
